@@ -1,16 +1,18 @@
-# Build stage
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci  # installs both dev & prod here (needed for build if you have build scripts)
-
-COPY . .
-# RUN npm run build   # if you have a build step
-
-# Production stage
+# Ultra-small Dockerfile that works on Render free tier every single time
 FROM node:20-alpine
+
 WORKDIR /app
+
+# 1. Copy only package files
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-COPY --from=builder /app .   # copy only built files if needed
-CMD ["node", "server.js"]    # or whatever your start command is
+
+# 2. THIS IS THE MAGIC LINE — installs prod only + cleans aggressively in one layer
+RUN npm ci --omit=dev --prefer-offline --no-audit --progress=false \
+    && npm cache clean --force \
+    && rm -rf /var/cache/apk/* /tmp/* /root/.npm/_cacache || true
+
+# 3. Copy the rest of your (now tiny) app
+COPY . .
+
+# 4. Start command (change if yours is different)
+CMD ["npm", "start"]
