@@ -1,18 +1,16 @@
-# Use official Node.js LTS image as base
-FROM node:20-alpine
-
-# Set working directory
+# Build stage
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# Copy package files and install dependencies first (better caching)
 COPY package*.json ./
-RUN npm install --production
+RUN npm ci  # installs both dev & prod here (needed for build if you have build scripts)
 
-# Copy the rest of the application code
 COPY . .
+# RUN npm run build   # if you have a build step
 
-# Expose the port your app uses
-EXPOSE 3000
-
-# Command to run the app
-CMD ["node", "index.js"]
+# Production stage
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=builder /app .   # copy only built files if needed
+CMD ["node", "server.js"]    # or whatever your start command is
